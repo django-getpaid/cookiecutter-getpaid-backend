@@ -1,14 +1,17 @@
 {
-  "full_name": "Your full name here",
+  "full_name": "Your Name",
   "email": "you@example.com",
-  "github_username": "yourname",
-  "broker_name": "payment broker short name goes here (e.g. PayU)",
-  "project_name": "Getpaid-{{ cookiecutter.broker_name }}",
-  "app_name": "getpaid_{{ cookiecutter.broker_name|lower() }}",
-  "app_config_name": "{{ cookiecutter.app_name|replace('_', ' ')|title()|replace(' ', '') }}Config",
-  "repo_name": "django-{{ cookiecutter.app_name|replace('_', '-') }}",
-  "project_short_description": "django-getpaid processor for {{ cookiecutter.broker_name }}",
-  "django_versions": "1.11,2.2",
+  "github_org": "django-getpaid",
+  "gateway_name": "MyGateway",
+  "gateway_slug": "{{ cookiecutter.gateway_name | lower | replace(' ', '_') | replace('-', '_') }}",
+  "package_name": "getpaid_{{ cookiecutter.gateway_slug }}",
+  "repo_name": "python-getpaid-{{ cookiecutter.gateway_slug | replace('_', '-') }}",
+  "pypi_name": "python-getpaid-{{ cookiecutter.gateway_slug | replace('_', '-') }}",
+  "project_description": "{{ cookiecutter.gateway_name }} payment gateway integration for python-getpaid ecosystem.",
+  "processor_class_name": "{{ cookiecutter.gateway_name | replace(' ', '') | replace('_', '') }}Processor",
+  "client_class_name": "{{ cookiecutter.gateway_name | replace(' ', '') | replace('_', '') }}Client",
+  "sandbox_url": "https://sandbox.example.com/",
+  "production_url": "https://api.example.com/",
   "version": "0.1.0",
-  "open_source_license": ["MIT", "BSD", "ISCL", "Apache Software License 2.0", "Not open source"]
+  "open_source_license": ["MIT", "BSD-3-Clause", "Apache-2.0"]
 }

@@ -1,274 +1,579 @@
-import os
-from contextlib import contextmanager
+"""Bake tests for the cookiecutter-getpaid-backend template.
+
+These tests use pytest-cookies to bake the cookiecutter template
+and verify the generated project has the expected structure, content,
+and configuration.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
 
 import pytest
-import sh
-from cookiecutter.utils import rmtree
 
 
-@contextmanager
-def inside_dir(dirpath):
-    """
-    Execute code from inside the given directory
-    :param dirpath: String, path of the directory the command is being run.
-    """
-    old_path = os.getcwd()
-    try:
-        os.chdir(dirpath)
-        yield
-    finally:
-        os.chdir(old_path)
+# -- Default bake context for convenience --
+
+DEFAULT_CONTEXT = {
+    "full_name": "Test Author",
+    "email": "test@example.com",
+    "github_org": "django-getpaid",
+    "gateway_name": "MyGateway",
+}
 
 
-@contextmanager
-def bake_in_temp_dir(cookies, *args, **kwargs):
-    """
-    Delete the temporal directory that is created when executing the tests
-    :param cookies: pytest_cookies.Cookies, cookie to be baked and its temporal files will be removed
-    """
-    result = cookies.bake(*args, **kwargs)
-    try:
-        yield result
-    finally:
-        rmtree(str(result.project))
+def _bake(cookies, extra_context=None):
+    """Bake the template and assert success."""
+    ctx = {**DEFAULT_CONTEXT, **(extra_context or {})}
+    result = cookies.bake(extra_context=ctx)
+    assert result.exit_code == 0, result.exception
+    assert result.exception is None
+    assert result.project_path.is_dir()
+    return result
 
 
-def test_bake_selecting_license(cookies):
-    """
-    Test to check if the LICENSE gets the correct license selected
-    """
-    license_strings = {
-        'Apache Software License 2.0': 'Apache',
-        'BSD': 'Redistributions of source code must retain the above copyright notice, this',
-        'ISCL': 'Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee',
-        'MIT': 'MIT ',
-    }
-    for license, target_string in license_strings.items():
-        with bake_in_temp_dir(cookies, extra_context={'open_source_license': license}) as result:
-            assert target_string in result.project.join('LICENSE').read()
-            assert license in result.project.join('setup.py').read()
+# ---------------------------------------------------------------
+# Project structure
+# ---------------------------------------------------------------
 
 
-def test_readme(cookies):
-    extra_context = {'app_name': 'helloworld'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
+class TestProjectStructure:
+    """Verify the generated project has the expected files."""
 
-        readme_file = result.project.join('README.rst')
-        readme_lines = [x.strip() for x in readme_file.readlines(cr=False)]
-        assert 'Add it to your `INSTALLED_APPS`:' in readme_lines
-        assert '(myenv) $ pip install tox' in readme_lines
+    def test_bake_with_defaults(self, cookies):
+        result = _bake(cookies)
+        project = result.project_path
+        assert project.name == "python-getpaid-mygateway"
 
+    def test_top_level_files(self, cookies):
+        project = _bake(cookies).project_path
+        expected = [
+            "pyproject.toml",
+            "README.md",
+            "LICENSE",
+            "CONTRIBUTING.md",
+            "CODE_OF_CONDUCT.md",
+            ".gitignore",
+            ".readthedocs.yml",
+        ]
+        for name in expected:
+            assert (project / name).is_file(), f"Missing {name}"
 
-
-def test_views_with_models(cookies):
-    """
-    Test case to assert if the views are created when the models are passed
-    """
-    extra_context = {'models': 'Pug,Dog', 'app_name': 'cookies'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-        views_file = result.project.join('cookies', 'views.py')
-        views_file_txt = views_file.read()
-        views = ['CreateView', 'DeleteView',
-                 'DetailView', 'UpdateView', 'ListView']
-        for view in views:
-            assert 'Pug{}'.format(view) in views_file_txt
-            assert 'Dog{}'.format(view) in views_file_txt
-
-
-def test_views_without_models(cookies):
-    """
-    Test case to assert that the views.py file is empty when there are no models defined
-    """
-    extra_context = {'app_name': 'cookies'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-        views_file = result.project.join('cookies', 'views.py')
-        views_file_txt = views_file.read()
-        assert views_file_txt == ''
-
-
-def test_urls_regex_with_model(cookies):
-    """
-    Test case to assert that the urls.py file is created when models are passed
-    """
-    extra_context = {'models': 'Pug,Dog', 'app_name': 'cookies'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-        urls_file = result.project.join('cookies', 'urls.py')
-        urls_file_txt = urls_file.read()
-        for model in extra_context['models'].split(','):
-            assert '^{}/~create/$'.format(model) in urls_file_txt
-            assert '^{}/(?P<pk>\d+)/~delete/$'.format(model) in urls_file_txt
-            assert '^{}/(?P<pk>\d+)/$'.format(model) in urls_file_txt
-            assert '^{}/(?P<pk>\d+)/~update/$'.format(model) in urls_file_txt
-            assert '^{}/$'.format(model) in urls_file_txt
-
-
-def test_urls_without_model(cookies):
-    """
-    Test case to assert that the urls.py file has the basic template when there are no models defined
-    """
-    extra_context = {'app_name': 'cookies'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-        urls_file = result.project.join('cookies', 'urls.py')
-        urls_file_txt = urls_file.read()
-        basic_url = "url(r'', TemplateView.as_view(template_name=\"base.html\"))"
-        assert basic_url in urls_file_txt
-
-
-def test_templates(cookies):
-    pass
-
-
-def test_travis(cookies):
-    extra_context = {'app_name': 'cookie_lover'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        travis_file = result.project.join('.travis.yml')
-        travis_text = travis_file.read()
-        assert 'script: tox -e $TOX_ENV' in travis_text
-
-
-def test_tox(cookies):
-    extra_context = {'app_name': 'cookie_lover'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        tox_file = result.project.join('tox.ini')
-        tox_text = tox_file.read()
-        assert 'commands = coverage run --source cookie_lover runtests.py' in tox_text
-
-
-def test_authors(cookies):
-    extra_context = {'full_name': 'Cookie McCookieface'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        authors_file = result.project.join('AUTHORS.rst')
-        authors_text = authors_file.read()
-        assert 'Cookie McCookieface' in authors_text
-
-def test_manifest(cookies):
-    extra_context = {'app_name': 'cookie_lover'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        manifest_file = result.project.join('MANIFEST.in')
-        manifest_text = manifest_file.read()
-        assert 'recursive-include cookie_lover *.html *.png *.gif *js *.css *jpg *jpeg *svg *py' in manifest_text
-
-
-def test_setup_py(cookies):
-    extra_context = {'app_name': 'cookie_lover', 'full_name': 'Cookie McCookieface'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        setup_file = result.project.join('setup.py')
-        setup_text = setup_file.read()
-        assert "version=version" in setup_text
-        assert "    author='Cookie McCookieface'," in setup_text
-
-
-def test_django_versions_default(cookies):
-    """
-    Test case to assert that the tox.ini & setup.py files are generated with correct versions w default Django versions
-    """
-
-    with bake_in_temp_dir(cookies) as result:
-
-        tox_file = result.project.join('tox.ini')
-        tox_text = tox_file.read()
-        assert "{py27,py35,py36}-django-111" in tox_text
-        assert "{py35,py36,py37}-django-21" in tox_text
-        travis_file = result.project.join('.travis.yml')
-        travis_text = travis_file.read()
-        assert 'py35-django-111' in travis_text
-        assert 'py36-django-111' in travis_text
-        assert 'py35-django-21' in travis_text
-        assert 'py36-django-21' in travis_text
-        assert 'py37-django-21' in travis_text
-        setup_file = result.project.join('setup.py')
-        setup_text = setup_file.read()
-        assert "'Framework :: Django :: 1.11'," in setup_text
-        assert "'Framework :: Django :: 2.1'," in setup_text
-        assert "'Programming Language :: Python :: 2'," in setup_text
-        assert "'Programming Language :: Python :: 2.7'," in setup_text
-        assert "'Programming Language :: Python :: 3'," in setup_text
-        assert "'Programming Language :: Python :: 3.5'," in setup_text
-        assert "'Programming Language :: Python :: 3.6'," in setup_text
-
-
-def test_new_django_versions(cookies):
-    """
-    Test case to assert that the tox.ini & setup.py files are generated with correct versions with a new Django version
-    """
-
-    extra_context = {'django_versions': '1.11,2.1'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        tox_file = result.project.join('tox.ini')
-        tox_text = tox_file.read()
-        assert "{py27,py35,py36}-django-111" in tox_text
-        assert 'django19' not in tox_text
-        travis_file = result.project.join('.travis.yml')
-        travis_text = travis_file.read()
-        assert 'py27-django-111' in travis_text
-        assert 'py35-django-111' in travis_text
-        assert 'django19' not in travis_text
-        setup_file = result.project.join('setup.py')
-        setup_text = setup_file.read()
-        assert "'Framework :: Django :: 2.1'," in setup_text
-        assert "'Framework :: Django :: 1.11'," in setup_text
-        assert "'Framework :: Django :: 1.9'," not in setup_text
-        assert "'Programming Language :: Python :: 2'," in setup_text
-        assert "'Programming Language :: Python :: 2.7'," in setup_text
-        assert "'Programming Language :: Python :: 3'," in setup_text
-        assert "'Programming Language :: Python :: 3.5'," in setup_text
-        assert "'Programming Language :: Python :: 3.6'," in setup_text
-        assert "'Programming Language :: Python :: 3.3'," not in setup_text
-
-
-def test_flake8_compliance(cookies):
-    """generated project should pass flake8"""
-    extra_context = {'create_example_project': 'Y'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-        for file_obj in result.project.listdir():
-            name = os.path.join(
-                file_obj.dirname,
-                file_obj.basename
+    def test_source_layout(self, cookies):
+        project = _bake(cookies).project_path
+        pkg = project / "src" / "getpaid_mygateway"
+        expected = [
+            "__init__.py",
+            "processor.py",
+            "client.py",
+            "types.py",
+            "py.typed",
+        ]
+        for name in expected:
+            assert (pkg / name).is_file(), (
+                f"Missing src/getpaid_mygateway/{name}"
             )
-            if not name.endswith('.py'):
+
+    def test_tests_layout(self, cookies):
+        project = _bake(cookies).project_path
+        tests = project / "tests"
+        expected = ["__init__.py", "conftest.py", "test_processor.py"]
+        for name in expected:
+            assert (tests / name).is_file(), f"Missing tests/{name}"
+
+    def test_docs_layout(self, cookies):
+        project = _bake(cookies).project_path
+        docs = project / "docs"
+        expected = [
+            "conf.py",
+            "requirements.txt",
+            "index.md",
+            "getting-started.md",
+            "configuration.md",
+            "concepts.md",
+            "reference.md",
+            "changelog.md",
+            "contributing.md",
+            "codeofconduct.md",
+            "license.md",
+        ]
+        for name in expected:
+            assert (docs / name).is_file(), f"Missing docs/{name}"
+
+    def test_github_issue_template(self, cookies):
+        project = _bake(cookies).project_path
+        tmpl = project / ".github" / "ISSUE_TEMPLATE.md"
+        assert tmpl.is_file()
+
+
+# ---------------------------------------------------------------
+# Variable substitution
+# ---------------------------------------------------------------
+
+
+class TestVariableSubstitution:
+    """Verify cookiecutter variables are correctly substituted."""
+
+    def test_custom_gateway_name(self, cookies):
+        result = _bake(
+            cookies,
+            extra_context={"gateway_name": "StripeConnect"},
+        )
+        project = result.project_path
+        assert project.name == "python-getpaid-stripeconnect"
+        pkg = project / "src" / "getpaid_stripeconnect"
+        assert pkg.is_dir()
+
+    def test_processor_class_name(self, cookies):
+        result = _bake(cookies)
+        processor = (
+            result.project_path / "src" / "getpaid_mygateway" / "processor.py"
+        )
+        content = processor.read_text()
+        assert "class MyGatewayProcessor(BaseProcessor):" in content
+
+    def test_client_class_name(self, cookies):
+        result = _bake(cookies)
+        client = result.project_path / "src" / "getpaid_mygateway" / "client.py"
+        content = client.read_text()
+        assert "class MyGatewayClient:" in content
+
+    def test_slug_in_processor(self, cookies):
+        result = _bake(cookies)
+        processor = (
+            result.project_path / "src" / "getpaid_mygateway" / "processor.py"
+        )
+        content = processor.read_text()
+        assert 'slug: ClassVar[str] = "mygateway"' in content
+        assert 'display_name: ClassVar[str] = "MyGateway"' in content
+
+    def test_init_exports(self, cookies):
+        result = _bake(cookies)
+        init = result.project_path / "src" / "getpaid_mygateway" / "__init__.py"
+        content = init.read_text()
+        assert "MyGatewayClient" in content
+        assert "MyGatewayProcessor" in content
+        assert '__version__ = "0.1.0"' in content
+
+    def test_author_in_pyproject(self, cookies):
+        result = _bake(
+            cookies,
+            extra_context={
+                "full_name": "Jan Kowalski",
+                "email": "jan@example.com",
+            },
+        )
+        content = (result.project_path / "pyproject.toml").read_text()
+        assert "Jan Kowalski" in content
+        assert "jan@example.com" in content
+
+    def test_urls_use_github_org(self, cookies):
+        result = _bake(
+            cookies,
+            extra_context={"github_org": "my-org"},
+        )
+        content = (result.project_path / "pyproject.toml").read_text()
+        assert "my-org/python-getpaid-mygateway" in content
+
+    def test_gateway_with_underscores(self, cookies):
+        """Gateway name with spaces produces underscored slug."""
+        result = _bake(
+            cookies,
+            extra_context={"gateway_name": "Pay Now"},
+        )
+        project = result.project_path
+        assert project.name == "python-getpaid-pay-now"
+        pkg = project / "src" / "getpaid_pay_now"
+        assert pkg.is_dir()
+        processor = (pkg / "processor.py").read_text()
+        assert "class PayNowProcessor(BaseProcessor):" in processor
+        assert 'slug: ClassVar[str] = "pay_now"' in processor
+
+
+# ---------------------------------------------------------------
+# pyproject.toml content
+# ---------------------------------------------------------------
+
+
+class TestPyprojectToml:
+    """Verify generated pyproject.toml has correct configuration."""
+
+    def _read_pyproject(self, cookies, extra_context=None):
+        result = _bake(cookies, extra_context=extra_context)
+        return (result.project_path / "pyproject.toml").read_text()
+
+    def test_project_name(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "name = 'python-getpaid-mygateway'" in content
+
+    def test_build_system(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "hatchling" in content
+        assert "build-backend = 'hatchling.build'" in content
+
+    def test_python_requires(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "requires-python = '>=3.12'" in content
+
+    def test_dependencies(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "'python-getpaid-core>=0.1.0'" in content
+        assert "'httpx>=0.27.0'" in content
+
+    def test_entry_point(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert '[project.entry-points."getpaid.backends"]' in content
+        assert (
+            "mygateway = 'getpaid_mygateway.processor:MyGatewayProcessor'"
+            in content
+        )
+
+    def test_hatch_wheel_packages(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "packages = ['src/getpaid_mygateway']" in content
+
+    def test_pytest_config(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "asyncio_mode = 'auto'" in content
+
+    def test_ruff_config(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "target-version = 'py312'" in content
+
+    def test_ty_config(self, cookies):
+        content = self._read_pyproject(cookies)
+        assert "python-version = '3.12'" in content
+        assert "error-on-warning = true" in content
+
+    def test_dev_dependencies(self, cookies):
+        content = self._read_pyproject(cookies)
+        for dep in ["pytest", "pytest-asyncio", "ruff", "ty", "respx"]:
+            assert dep in content, f"Missing dev dependency: {dep}"
+
+    def test_docs_dependencies(self, cookies):
+        content = self._read_pyproject(cookies)
+        for dep in ["furo", "sphinx", "myst-parser"]:
+            assert dep in content, f"Missing docs dependency: {dep}"
+
+
+# ---------------------------------------------------------------
+# License selection
+# ---------------------------------------------------------------
+
+
+class TestLicenseSelection:
+    """Verify LICENSE file content for each license choice."""
+
+    @pytest.mark.parametrize(
+        ("license_choice", "expected_text", "expected_classifier"),
+        [
+            ("MIT", "MIT License", "MIT License"),
+            (
+                "BSD-3-Clause",
+                "BSD 3-Clause License",
+                "BSD License",
+            ),
+            (
+                "Apache-2.0",
+                "Apache License 2.0",
+                "Apache Software License",
+            ),
+        ],
+    )
+    def test_license_file(
+        self, cookies, license_choice, expected_text, expected_classifier
+    ):
+        result = _bake(
+            cookies,
+            extra_context={"open_source_license": license_choice},
+        )
+        license_content = (result.project_path / "LICENSE").read_text()
+        assert expected_text in license_content
+
+        pyproject = (result.project_path / "pyproject.toml").read_text()
+        assert expected_classifier in pyproject
+
+    def test_license_has_author_name(self, cookies):
+        result = _bake(
+            cookies,
+            extra_context={"full_name": "Jan Kowalski"},
+        )
+        license_content = (result.project_path / "LICENSE").read_text()
+        assert "Jan Kowalski" in license_content
+
+    def test_license_in_pyproject(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "pyproject.toml").read_text()
+        assert "license = {text = 'MIT'}" in content
+
+
+# ---------------------------------------------------------------
+# Source file content
+# ---------------------------------------------------------------
+
+
+class TestSourceContent:
+    """Verify the generated source files have correct content."""
+
+    def test_processor_inherits_base_processor(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "processor.py"
+        ).read_text()
+        assert "from getpaid_core.processor import BaseProcessor" in content
+        assert "class MyGatewayProcessor(BaseProcessor):" in content
+
+    def test_processor_has_required_methods(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "processor.py"
+        ).read_text()
+        for method in [
+            "prepare_transaction",
+            "verify_callback",
+            "handle_callback",
+            "fetch_payment_status",
+        ]:
+            assert f"async def {method}" in content
+
+    def test_processor_has_sandbox_and_production_urls(self, cookies):
+        result = _bake(
+            cookies,
+            extra_context={
+                "sandbox_url": "https://sandbox.test.com/",
+                "production_url": "https://api.test.com/",
+            },
+        )
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "processor.py"
+        ).read_text()
+        assert "https://sandbox.test.com/" in content
+        assert "https://api.test.com/" in content
+
+    def test_client_uses_httpx(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "client.py"
+        ).read_text()
+        assert "import httpx" in content
+        assert "httpx.AsyncClient" in content
+
+    def test_client_is_async_context_manager(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "client.py"
+        ).read_text()
+        assert "async def __aenter__" in content
+        assert "async def __aexit__" in content
+
+    def test_types_has_auto_name_enum(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "src" / "getpaid_mygateway" / "types.py"
+        ).read_text()
+        assert "class AutoName(StrEnum):" in content
+
+    def test_py_typed_marker(self, cookies):
+        result = _bake(cookies)
+        py_typed = (
+            result.project_path / "src" / "getpaid_mygateway" / "py.typed"
+        )
+        assert py_typed.is_file()
+
+
+# ---------------------------------------------------------------
+# Tests layout content
+# ---------------------------------------------------------------
+
+
+class TestGeneratedTests:
+    """Verify the generated test files are reasonable."""
+
+    def test_conftest_has_mock_order(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "tests" / "conftest.py").read_text()
+        assert "class MockOrder" in content
+
+    def test_conftest_has_mock_payment(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "tests" / "conftest.py").read_text()
+        assert "class MockPayment" in content
+
+    def test_conftest_has_processor_fixture(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "tests" / "conftest.py").read_text()
+        assert "def processor" in content
+
+    def test_test_processor_has_attribute_tests(self, cookies):
+        result = _bake(cookies)
+        content = (
+            result.project_path / "tests" / "test_processor.py"
+        ).read_text()
+        assert "MyGatewayProcessor" in content
+        assert "BaseProcessor" in content
+
+
+# ---------------------------------------------------------------
+# Docs layout content
+# ---------------------------------------------------------------
+
+
+class TestDocsContent:
+    """Verify docs files reference the correct project."""
+
+    def test_docs_conf_project_name(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "docs" / "conf.py").read_text()
+        assert "python-getpaid-mygateway" in content
+        assert "furo" in content
+
+    def test_docs_index_includes_readme(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "docs" / "index.md").read_text()
+        assert "include" in content
+        assert "README.md" in content
+
+
+# ---------------------------------------------------------------
+# README content
+# ---------------------------------------------------------------
+
+
+class TestReadme:
+    """Verify the generated README has expected content."""
+
+    def test_readme_has_project_name(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "README.md").read_text()
+        assert "python-getpaid-mygateway" in content
+
+    def test_readme_has_disclaimer(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "README.md").read_text()
+        assert "nothing in common" in content.lower()
+
+    def test_readme_has_install_instructions(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "README.md").read_text()
+        assert "pip install" in content
+        assert "python-getpaid-mygateway" in content
+
+    def test_readme_has_entry_point_example(self, cookies):
+        result = _bake(cookies)
+        content = (result.project_path / "README.md").read_text()
+        assert "getpaid.backends" in content
+
+
+# ---------------------------------------------------------------
+# Hook validation
+# ---------------------------------------------------------------
+
+
+class TestHookValidation:
+    """Verify that pre-generation hooks reject invalid inputs."""
+
+    def test_invalid_slug_rejected(self, cookies):
+        """Slug with uppercase or special chars should fail."""
+        result = cookies.bake(
+            extra_context={
+                **DEFAULT_CONTEXT,
+                "gateway_name": "MyGateway",
+                "gateway_slug": "INVALID-Slug!",
+            }
+        )
+        assert result.exit_code != 0
+
+    def test_slug_starting_with_digit_rejected(self, cookies):
+        result = cookies.bake(
+            extra_context={
+                **DEFAULT_CONTEXT,
+                "gateway_name": "MyGateway",
+                "gateway_slug": "2checkout",
+            }
+        )
+        assert result.exit_code != 0
+
+    def test_invalid_package_name_rejected(self, cookies):
+        """Package name not starting with getpaid_ should fail."""
+        result = cookies.bake(
+            extra_context={
+                **DEFAULT_CONTEXT,
+                "gateway_name": "MyGateway",
+                "package_name": "not_getpaid_foo",
+            }
+        )
+        assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------
+# Ruff compliance
+# ---------------------------------------------------------------
+
+
+class TestRuffCompliance:
+    """Verify generated Python files pass ruff linting."""
+
+    def test_generated_python_passes_ruff_check(self, cookies):
+        """All generated .py files should pass ruff check."""
+        import subprocess
+
+        result = _bake(cookies)
+        project = result.project_path
+
+        py_files = list(project.rglob("*.py"))
+        assert len(py_files) > 0, "No Python files found"
+
+        proc = subprocess.run(
+            ["ruff", "check", "--no-fix", str(project)],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, (
+            f"ruff check failed:\n{proc.stdout}\n{proc.stderr}"
+        )
+
+    def test_generated_python_passes_ruff_format(self, cookies):
+        """All generated .py files should pass ruff format check."""
+        import subprocess
+
+        result = _bake(cookies)
+        project = result.project_path
+
+        proc = subprocess.run(
+            ["ruff", "format", "--check", str(project)],
+            capture_output=True,
+            text=True,
+        )
+        assert proc.returncode == 0, (
+            f"ruff format check failed:\n{proc.stdout}\n{proc.stderr}"
+        )
+
+
+# ---------------------------------------------------------------
+# No leftover template variables
+# ---------------------------------------------------------------
+
+
+class TestNoTemplateLeaks:
+    """Verify no raw cookiecutter variables remain in output."""
+
+    TEMPLATE_PATTERN = re.compile(r"\{\{\s*cookiecutter\.")
+
+    def test_no_template_variables_in_files(self, cookies):
+        """No generated file should contain raw {{ cookiecutter. }}."""
+        result = _bake(cookies)
+        project = result.project_path
+
+        for path in project.rglob("*"):
+            if not path.is_file():
                 continue
             try:
-                sh.flake8(name)
-            except sh.ErrorReturnCode as e:
-                pytest.fail(str(e))
-
-
-def test_app_config(cookies):
-    extra_context = {'app_name': 'cookie_lover'}
-    with bake_in_temp_dir(cookies, extra_context=extra_context) as result:
-
-        apps_file = result.project.join('cookie_lover', 'apps.py')
-        apps_text = apps_file.read()
-        assert 'CookieLoverConfig' in apps_text
-        assert "name = 'cookie_lover'" in apps_text
-        readme_file = result.project.join('README.rst')
-        readme_text = readme_file.read()
-        assert "'cookie_lover.apps.CookieLoverConfig'," in readme_text
-
-# example project tests from here on
-
-def test_make_migrations(cookies):
-    """generated project should be able to generate migrations"""
-    with bake_in_temp_dir(cookies, extra_context={}) as result:
-        res = result.project.join('manage.py')
-        try:
-            sh.python(res, 'makemigrations')
-        except sh.ErrorReturnCode as e:
-            pytest.fail(str(e))
-
-
-def test_run_tests(cookies):
-    """generated project should run tests"""
-    with bake_in_temp_dir(cookies, extra_context={}) as result:
-        res = result.project.join('runtests.py')
-        try:
-            with res.dirpath().as_cwd():
-                sh.python(res)
-        except sh.ErrorReturnCode as e:
-            pytest.fail(str(e))
+                content = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, ValueError):
+                continue
+            matches = self.TEMPLATE_PATTERN.findall(content)
+            assert not matches, (
+                f"Template variable leak in {path.relative_to(project)}: "
+                f"{matches}"
+            )

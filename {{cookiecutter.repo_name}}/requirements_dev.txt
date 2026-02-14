@@ -1,2 +1,0 @@
-poetry>=0.12
-pre-commit

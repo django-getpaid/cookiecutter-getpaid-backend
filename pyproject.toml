@@ -1,0 +1,41 @@
+[project]
+name = 'cookiecutter-getpaid-backend'
+version = '2.0.0'
+description = 'Cookiecutter template for python-getpaid payment gateway plugins.'
+readme = 'README.md'
+license = {text = 'MIT'}
+requires-python = '>=3.12'
+
+[dependency-groups]
+dev = [
+    'cookiecutter>=2.6.0',
+    'pytest>=8.0',
+    'pytest-cookies>=0.7.0',
+    'ruff>=0.9.0',
+]
+
+[tool.pytest.ini_options]
+testpaths = ['tests']
+
+[tool.ruff]
+target-version = 'py312'
+line-length = 80
+src = ['tests']
+
+[tool.ruff.lint]
+select = [
+    'E',
+    'W',
+    'F',
+    'I',
+    'N',
+    'UP',
+    'B',
+    'A',
+    'SIM',
+    'RUF',
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
