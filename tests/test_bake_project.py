@@ -20,6 +20,7 @@ DEFAULT_CONTEXT = {
     "email": "test@example.com",
     "github_org": "django-getpaid",
     "gateway_name": "MyGateway",
+    "accepted_currencies": "['PLN', 'EUR']",
 }
 
 
@@ -502,6 +503,12 @@ class TestHookValidation:
                 "gateway_name": "MyGateway",
                 "package_name": "not_getpaid_foo",
             }
+        )
+        assert result.exit_code != 0
+
+    def test_empty_accepted_currencies_rejected(self, cookies):
+        result = cookies.bake(
+            extra_context={**DEFAULT_CONTEXT, "accepted_currencies": "[]"}
         )
         assert result.exit_code != 0
 

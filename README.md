@@ -60,6 +60,7 @@ You will be prompted for the following values:
 | `client_class_name` | *auto* | Client class name (`<Name>Client`) |
 | `sandbox_url` | `https://sandbox.example.com/` | Gateway sandbox API URL |
 | `production_url` | `https://api.example.com/` | Gateway production API URL |
+| `accepted_currencies` | `[]` | **Required** Python list literal, e.g. `['PLN', 'EUR']` |
 | `version` | `0.1.0` | Initial version |
 | `open_source_license` | `MIT` | License choice: MIT, BSD-3-Clause, or Apache-2.0 |
 
@@ -120,8 +121,18 @@ uv sync
 uv run pytest
 ```
 
-The generated tests pass out of the box — they verify processor class
-attributes and initialization without requiring network access.
+The scaffold includes release-gate contract tests that intentionally fail
+until you implement core processor behavior.
+
+### Release checklist
+
+Before publishing a generated plugin, ensure all of the following are done:
+
+- Implement `prepare_transaction()`
+- Implement `verify_callback()` with signature/authenticity checks
+- Implement `handle_callback()` with explicit FSM transitions
+- Implement `fetch_payment_status()`
+- Set a non-empty `accepted_currencies` list
 
 ### Key Files to Implement
 

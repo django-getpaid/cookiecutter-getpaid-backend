@@ -1,5 +1,7 @@
 """Tests for {{ cookiecutter.processor_class_name }}."""
 
+import pytest
+from getpaid_core.exceptions import InvalidCallbackError
 from getpaid_core.processor import BaseProcessor
 
 from {{ cookiecutter.package_name }} import {{ cookiecutter.processor_class_name }}
@@ -53,3 +55,43 @@ class TestProcessorInit:
             config=processor_config,
         )
         assert proc.get_paywall_baseurl() == {{ cookiecutter.processor_class_name }}.production_url
+
+
+class TestImplementationContract:
+    """Release gate: these tests must pass before shipping."""
+
+    @pytest.mark.asyncio
+    async def test_prepare_transaction_implemented(self, processor) -> None:
+        try:
+            await processor.prepare_transaction()
+        except NotImplementedError:
+            pytest.fail("Implement prepare_transaction() before release.")
+
+    @pytest.mark.asyncio
+    async def test_verify_callback_rejects_invalid_payload(
+        self, processor
+    ) -> None:
+        with pytest.raises(InvalidCallbackError):
+            await processor.verify_callback(data={}, headers={})
+
+    @pytest.mark.asyncio
+    async def test_handle_callback_changes_or_validates_state(
+        self, processor
+    ) -> None:
+        initial_status = processor.payment.status
+        await processor.handle_callback(
+            data={"status": "confirm_payment"},
+            headers={},
+        )
+        assert processor.payment.status != initial_status, (
+            "Implement handle_callback() with explicit state handling "
+            "before release."
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_payment_status_implemented(self, processor) -> None:
+        try:
+            response = await processor.fetch_payment_status()
+        except NotImplementedError:
+            pytest.fail("Implement fetch_payment_status() before release.")
+        assert "status" in response

@@ -45,6 +45,17 @@ processor_cls = registry.get_by_slug("{{ cookiecutter.gateway_slug }}")
 
 TODO: Add gateway-specific configuration keys.
 
+## Release checklist
+
+The generated scaffold includes contract tests that fail until processor
+logic is implemented. Before publishing, make sure all items below are done:
+
+- [ ] `accepted_currencies` contains supported ISO currency codes
+- [ ] `prepare_transaction()` is implemented
+- [ ] `verify_callback()` validates callback authenticity
+- [ ] `handle_callback()` applies explicit FSM transitions
+- [ ] `fetch_payment_status()` is implemented
+
 ## Requirements
 
 - Python >= 3.12

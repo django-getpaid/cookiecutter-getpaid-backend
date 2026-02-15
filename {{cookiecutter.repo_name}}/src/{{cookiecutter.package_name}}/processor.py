@@ -18,7 +18,7 @@ class {{ cookiecutter.processor_class_name }}(BaseProcessor):
 
     slug: ClassVar[str] = "{{ cookiecutter.gateway_slug }}"
     display_name: ClassVar[str] = "{{ cookiecutter.gateway_name }}"
-    accepted_currencies: ClassVar[list[str]] = []  # TODO: add ISO codes
+    accepted_currencies: ClassVar[list[str]] = {{ cookiecutter.accepted_currencies | replace("'", '"') }}
     sandbox_url: ClassVar[str] = "{{ cookiecutter.sandbox_url }}"
     production_url: ClassVar[str] = "{{ cookiecutter.production_url }}"
 

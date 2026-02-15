@@ -12,6 +12,7 @@
   "client_class_name": "{{ cookiecutter.gateway_name | replace(' ', '') | replace('_', '') }}Client",
   "sandbox_url": "https://sandbox.example.com/",
   "production_url": "https://api.example.com/",
+  "accepted_currencies": "[]",
   "version": "0.1.0",
   "open_source_license": ["MIT", "BSD-3-Clause", "Apache-2.0"]
 }
