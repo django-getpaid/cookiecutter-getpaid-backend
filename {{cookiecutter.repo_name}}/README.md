@@ -59,7 +59,7 @@ logic is implemented. Before publishing, make sure all items below are done:
 ## Requirements
 
 - Python >= 3.12
-- [python-getpaid-core](https://pypi.org/project/python-getpaid-core/) >= 0.1.0
+- [python-getpaid-core](https://pypi.org/project/python-getpaid-core/) >= 3.0.0a3
 - [httpx](https://pypi.org/project/httpx/) >= 0.27.0
 
 ## Related Projects

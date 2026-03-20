@@ -219,7 +219,7 @@ class TestPyprojectToml:
 
     def test_dependencies(self, cookies):
         content = self._read_pyproject(cookies)
-        assert "'python-getpaid-core>=0.1.0'" in content
+        assert "'python-getpaid-core>=3.0.0a3'" in content
         assert "'httpx>=0.27.0'" in content
 
     def test_entry_point(self, cookies):
