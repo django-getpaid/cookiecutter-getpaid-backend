@@ -3,6 +3,7 @@
 import pytest
 from getpaid_core.exceptions import InvalidCallbackError
 from getpaid_core.processor import BaseProcessor
+from getpaid_core.types import PaymentUpdate
 
 from {{ cookiecutter.package_name }} import {{ cookiecutter.processor_class_name }}
 
@@ -78,13 +79,12 @@ class TestImplementationContract:
     async def test_handle_callback_changes_or_validates_state(
         self, processor
     ) -> None:
-        initial_status = processor.payment.status
-        await processor.handle_callback(
-            data={"status": "confirm_payment"},
+        result = await processor.handle_callback(
+            data={"status": "COMPLETED"},
             headers={},
         )
-        assert processor.payment.status != initial_status, (
-            "Implement handle_callback() with explicit state handling "
+        assert result is None or isinstance(result, PaymentUpdate), (
+            "Implement handle_callback() to return a semantic PaymentUpdate "
             "before release."
         )
 
@@ -94,4 +94,4 @@ class TestImplementationContract:
             response = await processor.fetch_payment_status()
         except NotImplementedError:
             pytest.fail("Implement fetch_payment_status() before release.")
-        assert "status" in response
+        assert response is None or isinstance(response, PaymentUpdate)

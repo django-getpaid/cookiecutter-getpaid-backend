@@ -53,7 +53,7 @@ logic is implemented. Before publishing, make sure all items below are done:
 - [ ] `accepted_currencies` contains supported ISO currency codes
 - [ ] `prepare_transaction()` is implemented
 - [ ] `verify_callback()` validates callback authenticity
-- [ ] `handle_callback()` applies explicit FSM transitions
+- [ ] `handle_callback()` returns semantic `PaymentUpdate` objects
 - [ ] `fetch_payment_status()` is implemented
 
 ## Requirements

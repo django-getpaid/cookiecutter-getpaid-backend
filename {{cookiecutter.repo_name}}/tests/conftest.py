@@ -5,8 +5,6 @@ from decimal import Decimal
 import pytest
 from getpaid_core.enums import FraudStatus
 from getpaid_core.enums import PaymentStatus
-from getpaid_core.fsm import create_fraud_machine
-from getpaid_core.fsm import create_payment_machine
 
 from {{ cookiecutter.package_name }} import {{ cookiecutter.processor_class_name }}
 
@@ -77,9 +75,7 @@ class MockPayment:
         self.amount_refunded = Decimal("0")
         self.fraud_status = FraudStatus.UNKNOWN
         self.fraud_message = ""
-
-        create_payment_machine(self)
-        create_fraud_machine(self)
+        self.provider_data = {}
 
     def is_fully_paid(self) -> bool:
         return self.amount_paid >= self.amount_required
@@ -96,7 +92,7 @@ def mock_order() -> MockOrder:
 
 @pytest.fixture
 def mock_payment(mock_order: MockOrder) -> MockPayment:
-    """Provide a mock payment with FSM attached."""
+    """Provide a mock payment protocol object."""
     return MockPayment(order=mock_order)
 
 

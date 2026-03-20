@@ -95,7 +95,7 @@ python-getpaid-<slug>/
 │       └── py.typed            # PEP 561 typing marker
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py             # MockOrder, MockPayment with FSM, fixtures
+│   ├── conftest.py             # MockOrder, MockPayment, fixtures
 │   └── test_processor.py       # Attribute and initialization tests
 └── docs/
     ├── conf.py                 # Sphinx + Furo + MyST config
@@ -130,7 +130,7 @@ Before publishing a generated plugin, ensure all of the following are done:
 
 - Implement `prepare_transaction()`
 - Implement `verify_callback()` with signature/authenticity checks
-- Implement `handle_callback()` with explicit FSM transitions
+- Implement `handle_callback()` with semantic `PaymentUpdate` results
 - Implement `fetch_payment_status()`
 - Set a non-empty `accepted_currencies` list
 
@@ -160,16 +160,20 @@ class MyGatewayProcessor(BaseProcessor):
                 external_id=result["id"],
             )
 
-    async def handle_callback(self, data, headers, **kwargs) -> None:
+    async def handle_callback(self, data, headers, **kwargs) -> PaymentUpdate | None:
         """Process a payment status callback from the gateway."""
         if data["status"] == "COMPLETED":
-            self.payment.confirm_payment()
+            return PaymentUpdate(
+                payment_event="payment_captured",
+                paid_amount=self.payment.amount_required,
+            )
+        return None
 
     async def verify_callback(self, data, headers, **kwargs) -> None:
         """Verify callback signature (raise InvalidCallbackError if invalid)."""
         ...
 
-    async def fetch_payment_status(self, **kwargs) -> PaymentStatusResponse:
+    async def fetch_payment_status(self, **kwargs) -> PaymentUpdate | None:
         """Poll the gateway for current payment status (PULL flow)."""
         ...
 ```
@@ -181,7 +185,7 @@ class MyGatewayProcessor(BaseProcessor):
 
 **Optional methods:**
 - `verify_callback()` — verifies callback authenticity (signature, etc.)
-- `handle_callback()` — processes status updates, triggers FSM transitions
+- `handle_callback()` — processes status updates and returns semantic payment updates
 - `charge()` — captures a previously authorized payment
 - `release_lock()` — releases a payment lock/hold
 - `refund()` — issues a refund
@@ -258,7 +262,7 @@ A typical payment flow:
 4. **Callback received** — the gateway sends a status update to your callback
    endpoint
 5. **Verify & handle** — `verify_callback()` checks authenticity, then
-   `handle_callback()` triggers FSM transitions on the payment object
+   `handle_callback()` returns a semantic `PaymentUpdate`
 6. **Status polling** (optional) — `fetch_payment_status()` can be used for
    PULL-based status updates
 
@@ -267,7 +271,7 @@ A typical payment flow:
 The generated test suite includes:
 
 - **`conftest.py`** — `MockOrder` and `MockPayment` classes satisfying the
-  getpaid-core protocols, with FSM state machines attached. Ready-to-use
+  getpaid-core protocols. Ready-to-use
   `processor`, `mock_order`, `mock_payment`, and `processor_config` fixtures.
 - **`test_processor.py`** — Tests verifying processor attributes (slug,
   display_name, currencies, URLs) and initialization (config access, sandbox

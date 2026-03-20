@@ -4,7 +4,8 @@ import logging
 from typing import ClassVar
 
 from getpaid_core.processor import BaseProcessor
-from getpaid_core.types import PaymentStatusResponse
+from getpaid_core.types import PaymentUpdate
+from getpaid_core.types import RefundResult
 from getpaid_core.types import TransactionResult
 
 from .client import {{ cookiecutter.client_class_name }}
@@ -55,22 +56,28 @@ class {{ cookiecutter.processor_class_name }}(BaseProcessor):
 
     async def handle_callback(
         self, data: dict, headers: dict, **kwargs
-    ) -> None:
+    ) -> PaymentUpdate | None:
         """Handle a payment status callback from the gateway.
 
-        Use FSM trigger methods on ``self.payment`` to transition
-        payment state:
-        - ``self.payment.confirm_payment()`` — mark as paid
-        - ``self.payment.mark_as_paid()`` — finalize
-        - ``self.payment.fail()`` — mark as failed
+        Return a semantic ``PaymentUpdate`` describing what changed.
+        Example:
+
+        - ``PaymentUpdate(payment_event="payment_captured", paid_amount=...)``
+        - ``PaymentUpdate(payment_event="failed")``
+        - ``PaymentUpdate(payment_event="refund_confirmed", refunded_amount=...)``
         """
         # TODO: implement callback handling
 
-    async def fetch_payment_status(self, **kwargs) -> PaymentStatusResponse:
+    async def fetch_payment_status(self, **kwargs) -> PaymentUpdate | None:
         """Fetch current payment status from the gateway (PULL flow).
 
         Returns:
-            PaymentStatusResponse with status trigger name.
+            PaymentUpdate describing the current semantic status.
         """
         # TODO: implement status polling
+        raise NotImplementedError
+
+    async def start_refund(self, amount=None, **kwargs) -> RefundResult:
+        """Start a refund and return refund metadata."""
+        # TODO: implement refund creation
         raise NotImplementedError
